@@ -29,8 +29,13 @@ For more detailed information on deployment, see the [documentation](https://dev
 ## Contents
 ### Leagues
 * Bundesliga
+* France Ligue 1
+* La Liga Santander
 * Premier League
-* La Liga
+* Serie A
+* Champions League
+### Teams & Players
+All the teams and players of the major leagues mentioned above are included along with the top national teams and players in football.
 
 ## References and How to report bugs
 * Actions on Google documentation: [https://developers.google.com/actions/](https://developers.google.com/actions/).
