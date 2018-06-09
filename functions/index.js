@@ -20,27 +20,46 @@ const {
     List, 
     TableCard,
     SimpleResponse,
+    MediaResponse,
+    Carousel,
+    BrowseCarousel,
+    BrowseCarouselItem,
 } = require('actions-on-google');
 
 const {values, concat, random, randomPop} = require('./utils');
-const facts = require('./facts');
+const players = require('./players');
+const teams = require('./teams');
+const leagues = require('./leagues');
 
 const app = dialogflow({
     debug: true,
     init: () => ({
         data: {
-            PLAYERS: facts.Players.reduce((obj, player) => {
-                obj[player.name] = player.facts.slice();
+            PLAYERS: players.Players.reduce((obj, player) => {
+                obj[player.name] = player;
                 return obj;
             }, {}),
-            TEAMS: facts.Teams.reduce((obj, team) => {
-                obj[team.name] = team.facts.slice();
+            TEAMS: teams.Teams.reduce((obj, team) => {
+                obj[team.name] = team;
                 return obj;
             }, {}),
-            LEAGUES: facts.Leagues.reduce((obj, league) => {
-                obj[league.name] = league.facts.slice();
+            LEAGUES: leagues.Leagues.reduce((obj, league) => {
+                obj[league.name] = league;
                 return obj;
             }, {}),
+            FIFA: [
+                "In 1986, FIFA banned shirt swapping because they did not want players being barechested on the field.",
+                "India qualified for the 1950 World Cup but withdrew when they realised that playing barefoot was against the rules.",
+                "Only eight nations have won the World Cup; Brazil, Italy, Germany, Argentina, Uruguay, England, Spain and France.",
+                "Russia’s Oleg Slanko holds the record for most individual goals in a single match, netting five goals against Cameroon in 1994.",
+                "Lucien Laurent of France scored the first goal in World Cup history on July 13, 1930.",
+                "The oldest goal scorer in the World Cup was Roger Milla, who was 42 in 1994 when he scored a goal for Cameroon against Russia.",
+                "The highest scoring game in World Cup history was in 1954, when Austria defeated Switzerland 7-5.",
+                "Of all countries that have appeared in the World Cup, Indonesia has played the least number of matches – just one in 1938.",
+                "Mexico has the most World Cup losses (25), though they do also have 14 wins and 14 draws.",
+                "Only 13 teams competed in the first World Cup: Argentina, Belgium, Brazil, Bolivia, Chile, France, Mexico, Paraguay, Peru, Romania, the United States, Uruguay, and Yugoslavia.",
+                "Only Brazil has qualified to compete in every World Cup since the tournament began in 1930."
+            ],
         },
     })
 });
@@ -53,33 +72,79 @@ const app = dialogflow({
  *      team: Any league/national football team (OPTIONAL) 
  *      league: Any league related to football (OPTIONAL) 
  */
-app.intent('FIFA-Facts', (conv, {player, team, league}) => {console.log("FIFA-Facts Intent");
-    const fact_prefix = "Okay, here's a fact about ";
-    
+app.intent('FIFA-Facts', (conv, {player, team, league}) => {
+    console.log("FIFA-Facts Intent");
+    var fact;
     // Check if any parameter is set or not 
     if (player) {
         const {PLAYERS} = conv.data;
-        conv.ask(new SimpleResponse({
-            speech: fact_prefix + player + ".\n" + random(PLAYERS[player]),
-            text: random(PLAYERS[player]),
-        }));
+        fact = random(PLAYERS[player]['facts']);
+        if (fact) {
+            conv.ask(new SimpleResponse({
+                speech: "Okay, here's a fact about " + PLAYERS[player]['name'] + ".\n" + fact,
+                text: PLAYERS[player]['fact_prefix'],
+            }));
+            conv.ask(new BasicCard({
+                title: player,
+                subtitle: "Footballer",
+                text: fact,
+                image: new Image({
+                  url: PLAYERS[player]['image_url'],
+                  alt: player,
+                }),
+            }));
+        }
+        else {
+            conv.ask("Sorry! I don't know about " + player + ".");
+        }
     }
     else if (team) {
         const {TEAMS} = conv.data;
-        conv.ask(new SimpleResponse({
-            speech: fact_prefix + team + ".\n" + random(TEAMS[team]),
-            text: random(TEAMS[team]),
-        }));
+        fact = random(TEAMS[team]['facts']);
+        if (fact) {
+            conv.ask(new SimpleResponse({
+                speech: "Okay, here's a fact about " + TEAMS[team]['name'] + ".\n" + fact,
+                text: TEAMS[team]['fact_prefix'],
+            }));
+            conv.ask(new BasicCard({
+                title: team,
+                subtitle: "Football Club",
+                text: fact,
+                image: new Image({
+                  url: TEAMS[team]['logo'],
+                  alt: team,
+                }),
+            }));
+        }
+        else {
+            conv.ask("Sorry! I don't know about " + team + ".");
+        }
     }
     else if (league) {
         const {LEAGUES} = conv.data;
-        conv.ask(new SimpleResponse({
-            speech: fact_prefix + league + ".\n" + random(LEAGUES[league]),
-            text: random(LEAGUES[league]),
-        }));
+        fact = random(LEAGUES[league]['facts']);
+        if (fact) {
+            conv.ask(new SimpleResponse({
+                speech: "Okay, here's a fact about " + LEAGUES[league]['name'] + ".\n" + fact,
+                text: LEAGUES[league]['fact_prefix'],
+            }));
+            conv.ask(new BasicCard({
+                title: league,
+                subtitle: "Football League",
+                text: fact,
+                image: new Image({
+                  url: LEAGUES[league]['logo'],
+                  alt: league,
+                }),
+            }));
+        }
+        else {
+            conv.ask("Sorry! I don't know about " + league + ".");
+        }
     }
     else {
-        conv.ask("Sorry! I don't know any fact related to FIFA");
+        const {FIFA} = conv.data;
+        conv.ask(random(FIFA));
     }
     
 });
@@ -91,86 +156,224 @@ app.intent('FIFA-Facts', (conv, {player, team, league}) => {console.log("FIFA-Fa
  *      team1: Any league/national football team (REQUIRED) 
  *      team2: Any league/national football team (OPTIONAL) 
  */
-app.intent('Match-Score', (conv, {team1, team2}) => {console.log("Match-Score Intent");
+app.intent('Match-Score', (conv, {team1, team2}) => {
+    console.log("Match-Score Intent");
+    const {TEAMS, LEAGUES} = conv.data;
+    var home_team, away_team;
     // Check if a single team or a pair of team is given 
     if (team1) {
         return getPreviousUpcomingTeamFixtures(team1, team2).then((fixtures) => {
             var previous_fixture = fixtures['previous_fixture'];
             var upcoming_fixture = fixtures['upcoming_fixture'];
-            var previous_fixture_details = '';
-            var upcoming_fixture_details = '';
-            if (previous_fixture)
-                previous_fixture_details = previous_fixture['homeTeamName'] + ' VS ' + previous_fixture['awayTeamName'] + '\n\t' + previous_fixture['result']['goalsHomeTeam'] + ' - ' + previous_fixture['result']['goalsAwayTeam'] + '\n';
-            if (upcoming_fixture)
-                upcoming_fixture_details = upcoming_fixture['homeTeamName'] + ' VS ' + upcoming_fixture['awayTeamName'] + '\n\t on ' + upcoming_fixture['date'] + '\n';
-            conv.ask(new SimpleResponse({
-                speech: previous_fixture_details + '\n' + upcoming_fixture_details,
-                text: previous_fixture_details + '\n' + upcoming_fixture_details,
-            }));
-            //conv.ask(new BasicCard({
-            //    title: previous_fixture['homeTeamName'] + '        ' + previous_fixture['awayTeamName'],
-            //    //subtitle: previous_fixture['result']['goalsHomeTeam'] + '  -  ' + previous_fixture['result']['goalsAwayTeam'],
-            //    image: new Image({
-            //        url: 'http://upload.wikimedia.org/wikipedia/de/3/3f/Real_Madrid_Logo.svg',
-            //        alt:  previous_fixture['homeTeamName'] + ' VS ' + previous_fixture['awayTeamName'],
-            //        display: 'WHITE',
-            //    }),
-            //    //text: '__' + previous_fixture['homeTeamName'] + '__  __' + previous_fixture['awayTeamName'] + '__  \n' + 
-            //    text: '__' + previous_fixture['result']['goalsHomeTeam'] + '__  -  __' + previous_fixture['result']['goalsAwayTeam'] + '__',
-            //}));
-            conv.ask(new List({
-                items: {
-                    'previous_match': {
-                        title: previous_fixture['homeTeamName'] + '        ' + previous_fixture['awayTeamName'],
-                        description: previous_fixture['result']['goalsHomeTeam'] + '  -  ' + previous_fixture['result']['goalsAwayTeam'],
-                        image: new Image({
-                            url: 'http://upload.wikimedia.org/wikipedia/de/3/3f/Real_Madrid_Logo.svg',
-                            alt:  previous_fixture['homeTeamName'] + ' VS ' + previous_fixture['awayTeamName'],
-                            display: 'WHITE',
+            var previous_fixture_date, upcoming_fixture_date;
+            
+            if (!previous_fixture && !upcoming_fixture) {
+                conv.ask("There are no matches scheduled for the given team currently.");
+                return fixtures;
+            }
+            
+            /* Simple Response */
+            conv.ask(jsonToSpeechText(fixtures, team1, team2));
+
+            if (!upcoming_fixture) {
+                home_team = '', away_team = '';
+                for (let i=0; i<teams.Teams.length; i++) {
+                    if (!home_team && teams.Teams[i]['synonyms'].indexOf(previous_fixture['homeTeamName']) !== -1) 
+                        home_team = teams.Teams[i]['name'];
+                    if (!away_team && teams.Teams[i]['synonyms'].indexOf(previous_fixture['awayTeamName']) !== -1) 
+                        away_team = teams.Teams[i]['name'];
+                }
+                previous_fixture_date = new Date(previous_fixture['date']);
+                conv.ask(new BasicCard({
+                    title: "Scores & Fixtures",
+                    //subtitle: "Previous Fixture",
+                    image: new Image({
+                        url: getLeagueImageUrl(previous_fixture['homeTeamName'], previous_fixture['awayTeamName'], previous_fixture_date, conv.data.LEAGUES),
+                        alt:  previous_fixture['homeTeamName'] + ' VS ' + previous_fixture['awayTeamName'],
+                    }),
+                    text: "__" + home_team + "__  " + previous_fixture['result']['goalsHomeTeam'] + "  ⚽  " + 
+                        previous_fixture['result']['goalsAwayTeam'] + "  __" + away_team + "__",
+                }));
+            }
+            else if (!previous_fixture) {
+                home_team = '', away_team = '';
+                for (let i=0; i<teams.Teams.length; i++) {
+                    if (!home_team && teams.Teams[i]['synonyms'].indexOf(upcoming_fixture['homeTeamName']) !== -1) 
+                        home_team = teams.Teams[i]['name'];
+                    if (!away_team && teams.Teams[i]['synonyms'].indexOf(upcoming_fixture['awayTeamName']) !== -1) 
+                        away_team = teams.Teams[i]['name'];
+                }
+                upcoming_fixture_date = new Date(upcoming_fixture['date']);
+                conv.ask(new BasicCard({
+                    title: "Scores & Fixtures",
+                    //subtitle: "Upcoming Fixture",
+                    image: new Image({
+                        url: getLeagueImageUrl(upcoming_fixture['homeTeamName'], upcoming_fixture['awayTeamName'], upcoming_fixture_date, conv.data.LEAGUES),
+                        alt:  upcoming_fixture['homeTeamName'] + ' VS ' + upcoming_fixture['awayTeamName'],
+                    }),
+                    text: "__" + home_team + "__  VS  __" + away_team + "__  \n" + 
+                        upcoming_fixture_date.toLocaleString(undefined, {
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric', 
+                            hour: 'numeric', 
+                            minute: 'numeric', 
+                            hour12: true, 
+                            timeZoneName: 'short', 
                         }),
-                    },
-                    'upcoming_match': {
-                        title: upcoming_fixture['homeTeamName'] + '        ' + upcoming_fixture['awayTeamName'],
-                        description: upcoming_fixture['result']['goalsHomeTeam'] + '  -  ' + upcoming_fixture['result']['goalsAwayTeam'],
-                        image: new Image({
-                            url: 'http://upload.wikimedia.org/wikipedia/de/3/3f/Real_Madrid_Logo.svg',
-                            alt:  previous_fixture['homeTeamName'] + ' VS ' + previous_fixture['awayTeamName'],
-                            display: 'WHITE',
-                        }),
-                    },
-                },
-            }));
-/* For Reference
-            conv.ask(new BasicCard({
-                text: `This is a basic card.  Text in a basic card can include "quotes" and
-                most other unicode characters including emoji 📱.  Basic cards also support
-                some markdown formatting like *emphasis* or _italics_, **strong** or
-                __bold__, and ***bold itallic*** or ___strong emphasis___ as well as other
-                things like line  \nbreaks`, // Note the two spaces before '\n' required for
-                                             // a line break to be rendered in the card.
-                subtitle: 'This is a subtitle',
-                title: 'Title: this is a title',
-                buttons: new Button({
-                  title: 'This is a button',
-                  url: 'https://assistant.google.com/',
-                }),
-                image: new Image({
-                  url: 'http://upload.wikimedia.org/wikipedia/de/3/3f/Real_Madrid_Logo.svg',
-                  alt: 'Image alternate text',
-                  display: 'CROPPED',
-                }),
-            }));
-*/
+                }));
+            }
+            else {
+                home_team = '', away_team = '';
+                for (let i=0; i<teams.Teams.length; i++) {
+                    if (!home_team && teams.Teams[i]['synonyms'].indexOf(previous_fixture['homeTeamName']) !== -1) 
+                        home_team = teams.Teams[i]['name'];
+                    if (!away_team && teams.Teams[i]['synonyms'].indexOf(previous_fixture['awayTeamName']) !== -1) 
+                        away_team = teams.Teams[i]['name'];
+                }
+                previous_fixture_date = new Date(previous_fixture['date']);
+                upcoming_fixture_date = new Date(upcoming_fixture['date']);
+                var previous_match = "previous_fixture;" + JSON.stringify(previous_fixture);
+                var upcoming_match = "upcoming_fixture;" + JSON.stringify(upcoming_fixture);
+                var list_items = {};
+                list_items[previous_match] = {
+                    title: home_team + "   " + previous_fixture['result']['goalsHomeTeam'] + "  ⚽  " + 
+                        previous_fixture['result']['goalsAwayTeam'] + "   " + away_team,
+                    description: previous_fixture_date.toLocaleString(undefined, {
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric', 
+                    }),
+                    image: new Image({
+                        url: getLeagueImageUrl(previous_fixture['homeTeamName'], previous_fixture['awayTeamName'], previous_fixture_date, conv.data.LEAGUES),
+                        alt:  previous_fixture['homeTeamName'] + " VS " + previous_fixture['awayTeamName'],
+                    }),
+                };
+                home_team = '', away_team = '';
+                for (let i=0; i<teams.Teams.length; i++) {
+                    if (!home_team && teams.Teams[i]['synonyms'].indexOf(upcoming_fixture['homeTeamName']) !== -1) 
+                        home_team = teams.Teams[i]['name'];
+                    if (!away_team && teams.Teams[i]['synonyms'].indexOf(upcoming_fixture['awayTeamName']) !== -1) 
+                        away_team = teams.Teams[i]['name'];
+                }
+                list_items[upcoming_match] = {
+                    title: home_team + "  VS  " + away_team,
+                    description: upcoming_fixture_date.toLocaleString(undefined, {
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric', 
+                        hour: 'numeric', 
+                        minute: 'numeric', 
+                        hour12: true, 
+                        timeZoneName: 'short', 
+                    }),
+                    image: new Image({
+                        url: getLeagueImageUrl(upcoming_fixture['homeTeamName'], upcoming_fixture['awayTeamName'], upcoming_fixture_date, conv.data.LEAGUES),
+                        alt:  upcoming_fixture['homeTeamName'] + " VS " + upcoming_fixture['awayTeamName'],
+                    }),
+                };
+                /* List Select to display fixtures */
+                conv.ask(new List({
+                    items: list_items,
+                }));
+            }
+
             return fixtures;
         }).catch((error) => {
+            console.log(error);
             conv.ask("I am not able to connect to the servers at the moment. Please come back later after some time to get the latest updates on your favourite teams.");
         });
     }
     else {
-        conv.ask("Sorry! I didn't get that. Can you say it again?")
+        conv.ask("Sorry! I didn't get that. Can you say it again?");
     }
-    console.log('Done');
     
+});
+
+/**
+ * React to the fixture (match) selection in the list select response
+ * of the Match-Score intent.
+ */
+app.intent('Match-Selected', (conv, params, option) => {
+    console.log("Match-Selected Intent");
+    if (option) {
+        var speech_text_response = "";
+        var fixture_type = option.split(';')[0];
+        var fixture = JSON.parse(option.split(';')[1]);
+        var fixture_date = new Date(fixture['date']);
+        var fixture_date_string = fixture_date.toLocaleString(undefined, {
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric', 
+        });
+        var fixture_time_string = fixture_date.toLocaleString(undefined, {
+            hour: 'numeric', 
+            minute: 'numeric', 
+            hour12: true, 
+        });
+        var home_team = '', away_team = '';
+        for (let i=0; i<teams.Teams.length; i++) {
+            if (!home_team && teams.Teams[i]['synonyms'].indexOf(fixture['homeTeamName']) !== -1) 
+                home_team = teams.Teams[i]['name'];
+            if (!away_team && teams.Teams[i]['synonyms'].indexOf(fixture['awayTeamName']) !== -1) 
+                away_team = teams.Teams[i]['name'];
+        }
+        if (fixture_type === 'previous_fixture') {
+            console.log('Previous Fixture Selected');
+            speech_text_response += "In the last match, " + home_team + " went up against " + away_team + " which ended " + 
+                                    fixture['result']['goalsHomeTeam'] + " - " + fixture['result']['goalsAwayTeam'];
+            if (fixture['result']['goalsHomeTeam'] > fixture['result']['goalsAwayTeam']) 
+                speech_text_response += " with " + home_team + "'s win.\n";
+            else if (fixture['result']['goalsHomeTeam'] < fixture['result']['goalsAwayTeam']) 
+                speech_text_response += " with " + away_team + "'s win.\n";
+            else 
+                speech_text_response += " in a draw.\n";
+            
+            conv.ask(speech_text_response);
+            conv.ask(new BasicCard({
+                title: "Scores & Fixtures",
+                //subtitle: "Previous Fixture",
+                image: new Image({
+                    url: getLeagueImageUrl(fixture['homeTeamName'], fixture['awayTeamName'], fixture_date, conv.data.LEAGUES),
+                    alt:  fixture['homeTeamName'] + ' VS ' + fixture['awayTeamName'],
+                }),
+                text: "__" + fixture['homeTeamName'] + "__  " + fixture['result']['goalsHomeTeam'] + "  ⚽  " + 
+                    fixture['result']['goalsAwayTeam'] + "  __" + fixture['awayTeamName'] + "__",
+            }));
+        }
+        else if (fixture_type === 'upcoming_fixture') {
+            console.log('Upcoming Fixture Selected');
+            speech_text_response += home_team + " will go up against " + away_team + " on " + fixture_date_string + " at " + 
+                                    fixture_time_string + ".";
+
+            conv.ask(speech_text_response);
+            conv.ask(new BasicCard({
+                title: "Scores & Fixtures",
+                //subtitle: "Upcoming Fixture",
+                image: new Image({
+                    url: getLeagueImageUrl(fixture['homeTeamName'], fixture['awayTeamName'], fixture_date, conv.data.LEAGUES),
+                    alt:  fixture['homeTeamName'] + ' VS ' + fixture['awayTeamName'],
+                }),
+                text: "__" + fixture['homeTeamName'] + "__  VS  __" + fixture['awayTeamName'] + "__  \n" + 
+                    fixture_date.toLocaleString(undefined, {
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric', 
+                        hour: 'numeric', 
+                        minute: 'numeric', 
+                        hour12: true, 
+                        timeZoneName: 'short', 
+                    }),
+            }));
+        }
+    }
+    else {
+        conv.ask("You did not select any fixture from the list or have selected an unknown fixture.");
+    }
 });
 
 exports.fifaGalaxy = functions.https.onRequest(app);
@@ -195,7 +398,8 @@ function getTeamNameAndId(team) {
         var team_name_id;
         http.get({
             host: host,
-            path: path
+            path: path,
+            headers: { 'X-Auth-Token': '7ec2b4ec0a5a426885f1bf55362d73de' }
         }, (raw_response) => {
             let body = ''; // var to store the raw response chunks
             raw_response.on('data', (raw_response_chunk) => { body += raw_response_chunk; }); // store each raw response chunk
@@ -242,7 +446,8 @@ function getTeamFixtures(team_id) {
         const path = '/v1/teams/' + team_id + '/fixtures/';
         http.get({
             host: host,
-            path: path
+            path: path,
+            headers: { 'X-Auth-Token': '7ec2b4ec0a5a426885f1bf55362d73de' }
         }, (raw_response) => {
             let body = ''; // var to store the raw response chunks
             raw_response.on('data', (raw_response_chunk) => { body += raw_response_chunk; }); // store each raw response chunk
@@ -270,8 +475,8 @@ function getTeamFixtures(team_id) {
  * Get the previous and the upcoming/current match details of the 
  * given team or a team pair.
  * Arguments:- 
- *      team1: Any league/national football team (REQUIRED)
- *      team2: Any league/national football team (OPTIONAL)
+ *      team1: Any league/national football team (REQUIRED) 
+ *      team2: Any league/national football team (OPTIONAL) 
  * Returns: JSON with previous and upcoming/current match details 
  */
 function getPreviousUpcomingTeamFixtures(team1, team2 = null) {
@@ -335,4 +540,150 @@ function getPreviousUpcomingTeamFixtures(team1, team2 = null) {
             reject(error);
         });
     });
+}
+
+/**
+ * Get league name of the given team.
+ * Arguments:- 
+ *      team: Any league/national football team 
+ * Returns:- League's name of the given team 
+ */
+function getLeagueName(team) {
+    for (var i=0; i<teams.Teams.length; i++) {
+        if (teams.Teams[i]['synonyms'].indexOf(team) !== -1) 
+            return teams.Teams[i]['league'];
+    }
+    return null;
+}
+
+/**
+ * Get the image url of the league to which the given 
+ * pair of teams belong.
+ * Arguments:-
+ *      team1: Any league/national football team 
+ *      team2: Any league/national football team 
+ *      date: Date of the fixture 
+ *      LEAGUES: List of all the leagues along with their data 
+ * Returns: URL of the image of the league 
+ */
+function getLeagueImageUrl(team1, team2, date, LEAGUES) {
+    var league1 = getLeagueName(team1);
+    var league2 = getLeagueName(team2);
+    if (league1 === league2) 
+        return LEAGUES[league1]['logo'];
+    else {
+        if (date.getMonth() > 4 && date.getMonth() < 7)
+            return "https://eplfootballmatch.com/wp-content/uploads/2017/03/international-friendly-match-2z8pgeckcwr9lg4nwfo8i2-535x300.jpg";
+        else
+            return LEAGUES['Champions League']['logo'];
+    }
+}
+
+/**
+ * Get the speech/text response for the Google assistant according to 
+ * the JSON response passed as a parameter to the function 
+ * (Match-Score Intent).
+ * Arguments:- 
+ *      json_response: JSON response to be converted to speech/text response 
+ *      team1: Any league/national football team (REQUIRED)
+ *      team2: Any league/national football team (OPTIONAL)
+ * Returns:- Speech/Text response for the Google Assistant 
+ */
+function jsonToSpeechText(json_response, team1, team2) {
+    if (json_response['previous_fixture']) {
+        var previous_fixture_date = new Date(json_response['previous_fixture']['date']);
+        var previous_fixture_date_string = previous_fixture_date.toLocaleString(undefined, {
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric', 
+        });
+        // Previous Fixture Response 
+        var speech_text_response = "In the last match, " + team1 + " went up against ";
+        var home_team = '', away_team = '';
+        var team1_goals, team2_goals;
+        for (let i=0; i<teams.Teams.length; i++) {
+            if (!home_team && teams.Teams[i]['synonyms'].indexOf(json_response['previous_fixture']['homeTeamName']) !== -1) 
+                home_team = teams.Teams[i]['name'];
+            if (!away_team && teams.Teams[i]['synonyms'].indexOf(json_response['previous_fixture']['awayTeamName']) !== -1) 
+                away_team = teams.Teams[i]['name'];
+        }
+
+        if (team1 === home_team) {
+            speech_text_response += away_team + ", which ended " + json_response['previous_fixture']['result']['goalsHomeTeam'] + 
+                                    " - " + json_response['previous_fixture']['result']['goalsAwayTeam'];
+            team1_goals = json_response['previous_fixture']['result']['goalsHomeTeam'];
+            team2_goals = json_response['previous_fixture']['result']['goalsAwayTeam'];
+        }
+        else {
+        speech_text_response += home_team + ", which ended " + json_response['previous_fixture']['result']['goalsAwayTeam'] + 
+                                " - " + json_response['previous_fixture']['result']['goalsHomeTeam'];
+        team1_goals = json_response['previous_fixture']['result']['goalsAwayTeam'];
+        team2_goals = json_response['previous_fixture']['result']['goalsHomeTeam'];
+        }
+    
+        if (team1_goals > team2_goals) 
+                speech_text_response += " with " + team1 + "'s win.\n";
+        else if (team1_goals < team2_goals) 
+            speech_text_response += " with " + (!team2 ? (team1 + "'s loss.\n") : (team2 + "'s win.\n"));
+        else 
+            speech_text_response += " in a draw.\n";
+    }
+    else if (json_response['upcoming_fixture']) {
+        let upcoming_fixture_date = new Date(json_response['upcoming_fixture']['date']);
+        let upcoming_fixture_date_string = upcoming_fixture_date.toLocaleString(undefined, {
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric', 
+        });
+        let upcoming_fixture_time_string = upcoming_fixture_date.toLocaleString(undefined, {
+            hour: 'numeric', 
+            minute: 'numeric', 
+            hour12: true, 
+        });
+        // Upcoming Fixture Response Only (No Previous Fixture Response)
+        home_team = '', away_team = '';
+        for (let i=0; i<teams.Teams.length; i++) {
+            if (!home_team && teams.Teams[i]['synonyms'].indexOf(json_response['upcoming_fixture']['homeTeamName']) !== -1) 
+                home_team = teams.Teams[i]['name'];
+            if (!away_team && teams.Teams[i]['synonyms'].indexOf(json_response['upcoming_fixture']['awayTeamName']) !== -1) 
+                away_team = teams.Teams[i]['name'];
+        }
+        if (team2)
+            speech_text_response += home_team + " will go up against " + away_team + " on " + upcoming_fixture_date_string + " at " + 
+                                    upcoming_fixture_time_string + ".";
+        else
+            speech_text_response += team1 + " will go up against " + (team1 === home_team ? away_team : home_team) + 
+                                    " on " + upcoming_fixture_date_string + " at " + upcoming_fixture_time_string + ".";
+        
+        return speech_text_response;
+    }
+    if (json_response['upcoming_fixture']) {
+        var upcoming_fixture_date = new Date(json_response['upcoming_fixture']['date']);
+        var upcoming_fixture_date_string = upcoming_fixture_date.toLocaleString(undefined, {
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric', 
+        });
+        var upcoming_fixture_time_string = upcoming_fixture_date.toLocaleString(undefined, {
+            hour: 'numeric', 
+            minute: 'numeric', 
+            hour12: true, 
+        });
+        // Upcoming Fixture Response 
+        home_team = '', away_team = '';
+        for (let i=0; i<teams.Teams.length; i++) {
+            if (!home_team && teams.Teams[i]['synonyms'].indexOf(json_response['upcoming_fixture']['homeTeamName']) !== -1) 
+                home_team = teams.Teams[i]['name'];
+            if (!away_team && teams.Teams[i]['synonyms'].indexOf(json_response['upcoming_fixture']['awayTeamName']) !== -1) 
+                away_team = teams.Teams[i]['name'];
+        }
+        if (!team2)
+            speech_text_response += "The club's next game will be on " + upcoming_fixture_date_string + " at " + 
+                                    upcoming_fixture_time_string + ", where they will take on " + 
+                                    (team1 === home_team ? away_team : home_team) + ".";
+        else 
+            speech_text_response += "Their next game wil be on " + upcoming_fixture_date_time + ".";
+    }
+
+    return speech_text_response;
 }

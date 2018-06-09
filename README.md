@@ -1,4 +1,4 @@
-# FIFA Galaxy
+# FIFA Galaxy for Google Assistant
 FIFA Galaxy, is a Google Assistant application normally called an Action on Google Assistant, built using Dialogflow and Node.js. It lets you know interesting facts about your favorite football star, club, national team and also keeps you updated on the latest happenings in the world of football.
 
 ## Setup Instructions
@@ -28,12 +28,12 @@ For more detailed information on deployment, see the [documentation](https://dev
 
 ## Contents
 ### Leagues
-* Bundesliga
-* France Ligue 1
-* La Liga Santander
-* Premier League
-* Serie A
-* Champions League
+* Bundesliga (Germany) 
+* Ligue 1 (France) 
+* La Liga Santander (Spain) 
+* Premier League (England) 
+* Serie A (Italy) 
+* Champions League (Europe) 
 ### Teams & Players
 All the teams and players of the major leagues mentioned above are included along with the top national teams and players in football.
 

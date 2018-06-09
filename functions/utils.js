@@ -44,3 +44,17 @@ exports.randomPop = (array) => {
   array.splice(array.indexOf(element), 1);
   return element;
 };
+
+/**
+ * Convert DateTime object from one time zone to 
+ * another time zone.
+ * Arguments:- 
+ *      dt1: DateTime object which needs to be converted to another time zone 
+ *      dt2: DateTime object of the time zone to which dt1 needs to be converted 
+ * Returns:- Converted DateTime object to new time zone 
+ */
+exports.convertDateTime = (dt1, dt2) => {
+  const offset = dt2.getTimezoneOffset() * 60000;
+  var dt1_time = dt1.getTime();
+  return (new Date(dt1_time + offset));
+};
